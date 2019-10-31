@@ -9,6 +9,7 @@ import time
 from kivy.app import App
 from kivy.lang import Builder
 from kivy.uix.label import Label
+from kivy.uix import widget
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.relativelayout import RelativeLayout
 
@@ -27,6 +28,7 @@ import numpy as np
 from kivy.uix.slider import Slider
 from kivy.uix.dropdown import DropDown
 from kivy.clock import Clock
+from kivy.uix.widget import Widget
 
 Builder.load_string("""
 <Particle@RelativeLayout>:                    
@@ -35,7 +37,7 @@ Builder.load_string("""
             rgba:1,1,1,1
         Ellipse:
             size:5,5
-            pos:root.ParticlePosX,root.ParticlePosY
+            pos:root.x_pos,root.y_pos
 
 
 
@@ -91,57 +93,122 @@ global pressure
 pressure = 0
 
 
-class pressureReader(Label):
+def create_first_grid(box):
+    app: App = App.get_running_app()
+    app.point_dict = {}
+    app.box_height = box.height
+    app.box_width = box.width
+    print(box.width, box.height)
+    for i in range(int(800)+1):
+        for j in range(int(800)+1):
+            app.point_dict[(i, j)] = []
+    print(app.point_dict.keys())
+    pass
+
+
+
+def create_grid(box):
+    app: App = App.get_running_app()
+    app.point_dict = {}
+    app.box_height = box.height
+    app.box_width = box.width
+    print(box.width, box.height)
+    for i in range(int(box.height)+1):
+        for j in range(int(box.height)+1):
+            app.point_dict[(i, j)] = []
+    print(app.point_dict.keys())
+    pass
+
+
+def remove_from_grid(wid: Widget):
+    app = App.get_running_app()
+    if wid in app.point_dict[wid.coordinate]:
+        app.point_dict[wid.coordinate].remove(wid)
+    pass
+
+
+def place_in_grid(wid: Widget):
+    app = App.get_running_app()
+    if wid not in app.point_dict[wid.coordinate]:
+        app.point_dict[wid.coordinate].append(wid)
     pass
 
 
 class Particle(RelativeLayout):
-    ParticlePosX = NumericProperty(0)
-    ParticlePosY = NumericProperty(0)
+    x_pos = NumericProperty(0)
+    y_pos = NumericProperty(0)
     velocity = NumericProperty(0)
 
     def __init__(self, **kwargs):
         super(Particle, self).__init__(**kwargs)
-        self.ParticlePosX = 50
-        self.ParticlePosY = 50
+        self.x_pos = 50
+        self.y_pos = 50
         self.velocity = 0
         self.velocity_x = 0
         self.velocity_y = 0
-        self.accelerationX = 1
-        self.accelerationY = 1
+        self.accelerationX = 0
+        self.accelerationY = 0
         self.mass = 1
         self.time_added = time.time()
         self.schedule_events()
 
+    @property
+    def coordinate(self):
+        widx = self.x_pos
+        widy = self.y_pos
+        x = int(widx/5)
+        y = int(widy/5)
+        return (x, y)
 
     def schedule_events(self):
-        Clock.schedule_interval(self.moveParticle, 0.05)
+        Clock.schedule_interval(self.move, 0.05)
+        Clock.schedule_interval(self.collide, 0.05)
 
-    def moveParticle(self, dt):
+    def collide(self, dt):
+        app = App.get_running_app()
+        if self.coordinate[0] > 0 and self.coordinate[1] > 0:
+            if len(app.point_dict[self.coordinate]) > 1:
+                print("collide!")
+                for wid in app.point_dict[self.coordinate]:
+                    if wid != self:
+                        vel_x = wid.velocity_x
+                        vel_y = wid.velocity_y
+                        if vel_y > vel_x:
+                            mod = (-1, 1)
+                        else:
+                            mod = (1, -1)
+
+                        wid.velocity_x, wid.velocity_y = mod[0]*self.velocity_x, mod[1]*self.velocity_y
+                        self.velocity_x, self.velocity_y = mod[0]*vel_x, mod[1]*vel_y
+                        break
+
+    def move(self, dt):
         # first move particles
-        self.ParticlePosX += self.velocity_x * dt + 0.5 * self.accelerationX * dt * dt
-        self.ParticlePosY += self.velocity_y * dt + 0.5 * self.accelerationY * dt * dt
+        remove_from_grid(self)
+        self.x_pos += self.velocity_x * dt + 0.5 * self.accelerationX * dt * dt
+        self.y_pos += self.velocity_y * dt + 0.5 * self.accelerationY * dt * dt
         # then check if particles have hit wall.
         # if they have then
         if self.parent:
-            if self.ParticlePosY > self.parent.height:
+            if self.y_pos > self.parent.height:
                 self.parent.pressure += self.mass * 2 * (abs(self.velocity_y)) / dt
-                self.ParticlePosY = self.parent.height
+                self.y_pos = self.parent.height
                 self.velocity_y = -self.velocity_y
-            elif self.ParticlePosY < 0:
+            elif self.y_pos < 0:
                 self.parent.pressure += self.mass * 2 * (abs(self.velocity_y)) / dt
-                self.ParticlePosY = 0
+                self.y_pos = 0
                 self.velocity_y = -self.velocity_y
-            if self.ParticlePosX > self.parent.width:
+            if self.x_pos > self.parent.width:
                 self.parent.pressure += self.mass * 2 * (abs(self.velocity_x)) / dt
-                self.ParticlePosX = self.parent.width
+                self.x_pos = self.parent.width
                 self.velocity_x = -self.velocity_x
-            elif self.ParticlePosX < 0:
+            elif self.x_pos < 0:
                 self.parent.pressure += self.mass * 2 * (abs(self.velocity_x)) / dt
-                self.ParticlePosX = 0
+                self.x_pos = 0
                 self.velocity_x = -self.velocity_x
+            place_in_grid(self)
         else:
-            Clock.unschedule(self.moveParticle)
+            Clock.unschedule(self.move)
 
     pass
 
@@ -155,15 +222,19 @@ class ParticleBox(RelativeLayout):
     def __init__(self, **kwargs):
         super(ParticleBox, self).__init__(**kwargs)
         # ccreate list of widgets
+        create_first_grid(self)
+        print(self.width, self.height)
         self.particles_in_box = {}
         self.size = (800, 600)
         self.velocity = 200
         self.temperature = (1/1000)*0.5*self.velocity**2
-        self.number_particles = 200
+        self.number_particles = 100
+        self.last_height = self.height
+        self.last_width = self.width
         for i in range(self.number_particles):
             particle = Particle()
-            particle.ParticlePosX = self.width * np.random.random()
-            particle.ParticlePosY = self.height * np.random.random()
+            particle.x_pos = self.width * np.random.random()
+            particle.y_pos = self.height * np.random.random()
             particle.velocity_x = self.velocity * random.choice([-1, 1]) * np.random.random()
             particle.velocity_y = self.velocity * random.choice([-1, 1]) * np.random.random()
             particle.accelerationX = 1 ** random.choice([-1, 1]) * np.random.random()
@@ -178,14 +249,14 @@ class ParticleBox(RelativeLayout):
 
     def schedule_events(self):
         #        Clock.schedule_interval(lambda dt: self.checkPressure(), 2)
-        Clock.schedule_interval(self.checkPressure, 2)
+        Clock.schedule_interval(self.check_pressure, 2)
         Clock.schedule_interval(self.check_velocity, 0.5)
         Clock.schedule_interval(self.check_number, 0.5)
+        # Clock.schedule_interval(self.check_window, 20)
 
-    def checkPressure(self, dt):
+    def check_pressure(self, dt):
         oldPressure = self.pressure
         self.avgPressure = int(oldPressure / 1000)
-        print(oldPressure)
         self.pressure = 0
 
     def check_number(self, dt):
@@ -202,14 +273,23 @@ class ParticleBox(RelativeLayout):
             self.particles_in_box = {}
             for i in range(self.number_particles):
                 particle = Particle()
-                particle.ParticlePosX = self.width * np.random.random()
-                particle.ParticlePosY = self.height * np.random.random()
+                particle.x_pos = self.width * np.random.random()
+                particle.y_pos = self.height * np.random.random()
                 particle.velocity_x = self.velocity * random.choice([-1, 1]) * np.random.random()
                 particle.velocity_y = self.velocity * random.choice([-1, 1]) * np.random.random()
                 particle.accelerationX = 1 ** random.choice([-1, 1]) * np.random.random()
                 particle.accelerationY = 1 ** random.choice([-1, 1]) * np.random.random()
                 self.particles_in_box[i] = particle
                 self.add_widget(self.particles_in_box[i])
+
+    def check_window(self, dt):
+        if self.last_height != self.height or self.last_width != self.width:
+            print(self.width, self.height)
+            create_grid(self)
+            self.last_height = self.height
+            self.last_width = self.width
+            print("resized!")
+        pass
 
 
 class glassWindow(RelativeLayout):
