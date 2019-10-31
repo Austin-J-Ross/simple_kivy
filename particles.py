@@ -34,7 +34,7 @@ Builder.load_string("""
         Color:
             rgba:1,1,1,1
         Ellipse:
-            size:30,30
+            size:5,5
             pos:root.ParticlePosX,root.ParticlePosY
 
 
@@ -123,23 +123,25 @@ class Particle(RelativeLayout):
         self.ParticlePosY += self.velocity_y * dt + 0.5 * self.accelerationY * dt * dt
         # then check if particles have hit wall.
         # if they have then
-        print("parent", self.parent, self.time_added)
-        if self.ParticlePosY > self.parent.height:
-            self.parent.pressure += self.mass * 2 * (abs(self.velocity_y)) / dt
-            self.ParticlePosY = self.parent.height
-            self.velocity_y = -self.velocity_y
-        elif self.ParticlePosY < 0:
-            self.parent.pressure += self.mass * 2 * (abs(self.velocity_y)) / dt
-            self.ParticlePosY = 0
-            self.velocity_y = -self.velocity_y
-        if self.ParticlePosX > self.parent.width:
-            self.parent.pressure += self.mass * 2 * (abs(self.velocity_x)) / dt
-            self.ParticlePosX = self.parent.width
-            self.velocity_x = -self.velocity_x
-        elif self.ParticlePosX < 0:
-            self.parent.pressure += self.mass * 2 * (abs(self.velocity_x)) / dt
-            self.ParticlePosX = 0
-            self.velocity_x = -self.velocity_x
+        if self.parent:
+            if self.ParticlePosY > self.parent.height:
+                self.parent.pressure += self.mass * 2 * (abs(self.velocity_y)) / dt
+                self.ParticlePosY = self.parent.height
+                self.velocity_y = -self.velocity_y
+            elif self.ParticlePosY < 0:
+                self.parent.pressure += self.mass * 2 * (abs(self.velocity_y)) / dt
+                self.ParticlePosY = 0
+                self.velocity_y = -self.velocity_y
+            if self.ParticlePosX > self.parent.width:
+                self.parent.pressure += self.mass * 2 * (abs(self.velocity_x)) / dt
+                self.ParticlePosX = self.parent.width
+                self.velocity_x = -self.velocity_x
+            elif self.ParticlePosX < 0:
+                self.parent.pressure += self.mass * 2 * (abs(self.velocity_x)) / dt
+                self.ParticlePosX = 0
+                self.velocity_x = -self.velocity_x
+        else:
+            Clock.unschedule(self.moveParticle)
 
     pass
 
@@ -158,7 +160,6 @@ class ParticleBox(RelativeLayout):
         self.velocity = 200
         self.temperature = (1/1000)*0.5*self.velocity**2
         self.number_particles = 200
-        print("particle start!")
         for i in range(self.number_particles):
             particle = Particle()
             particle.ParticlePosX = self.width * np.random.random()
@@ -168,7 +169,6 @@ class ParticleBox(RelativeLayout):
             particle.accelerationX = 1 ** random.choice([-1, 1]) * np.random.random()
             particle.accelerationY = 1 ** random.choice([-1, 1]) * np.random.random()
             self.particles_in_box[i] = particle
-            print(i)
             self.add_widget(self.particles_in_box[i])
             self.pressure = 0
             self.avgPressure = 0
@@ -191,7 +191,6 @@ class ParticleBox(RelativeLayout):
     def check_number(self, dt):
         oldPressure = self.pressure
         self.avgPressure = int(oldPressure / 1000)
-        print(oldPressure)
         self.pressure = 0
 
     def check_velocity(self, dt):
@@ -200,7 +199,6 @@ class ParticleBox(RelativeLayout):
             self.temperature = (1/1000)*0.5*self.velocity**2
             for i, particle in enumerate(self.particles_in_box.keys()):
                 self.remove_widget(self.particles_in_box[i])
-                print("removing particle")
             self.particles_in_box = {}
             for i in range(self.number_particles):
                 particle = Particle()
@@ -212,7 +210,6 @@ class ParticleBox(RelativeLayout):
                 particle.accelerationY = 1 ** random.choice([-1, 1]) * np.random.random()
                 self.particles_in_box[i] = particle
                 self.add_widget(self.particles_in_box[i])
-            print('finished adding', len(self.children), time.time())
 
 
 class glassWindow(RelativeLayout):
