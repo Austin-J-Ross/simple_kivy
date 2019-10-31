@@ -4,6 +4,7 @@ Created on Thu Jun 13 18:17:48 2019
 
 @author: Austin
 """
+import time
 
 from kivy.app import App
 from kivy.lang import Builder
@@ -28,7 +29,7 @@ from kivy.uix.dropdown import DropDown
 from kivy.clock import Clock
 
 Builder.load_string("""
-<particleGen@RelativeLayout>:                    
+<Particle@RelativeLayout>:                    
     canvas:
         Color:
             rgba:1,1,1,1
@@ -63,7 +64,12 @@ Builder.load_string("""
                 pos:5,5
             Label:
                 markup:True
-                text:'[size=24px][color=#ffffff][b]Temperature[/b][/color][/size]'
+                text:'[size=24px][color=#ffffff][b]Temperature:[/b][/color][/size]'
+                size_hint_y:None
+                height:20
+            RelativeLayout:
+                size:self.size
+                pos:self.pos
             Slider:
                 id: _vslide
                 value: 200
@@ -71,16 +77,11 @@ Builder.load_string("""
                 step: 10
             Label:
                 markup:True
-                text:'[size=24px][color=#ffffff][b]Value[/b][/color][/size]'  
-            Label:
-                markup:True
-                text:'[size=24px][color=#ffffff][b]'+str(root.particle_box.temperature)+'[/b][/color][/size]'      
+                text:'[size=24px][color=#ffffff][b]'+str(int(root.particle_box.temperature))+'[/b][/color][/size]'      
         ParticleBox:
             id:_particleBox
             size:self.size
             pos:self.pos
-
-
 
 """)
 import random
@@ -94,21 +95,22 @@ class pressureReader(Label):
     pass
 
 
-class particleGen(RelativeLayout):
+class Particle(RelativeLayout):
     ParticlePosX = NumericProperty(0)
     ParticlePosY = NumericProperty(0)
     velocity = NumericProperty(0)
 
     def __init__(self, **kwargs):
-        super(particleGen, self).__init__(**kwargs)
+        super(Particle, self).__init__(**kwargs)
         self.ParticlePosX = 50
         self.ParticlePosY = 50
         self.velocity = 0
-        self.velocityX = 0
-        self.velocityY = 0
+        self.velocity_x = 0
+        self.velocity_y = 0
         self.accelerationX = 1
         self.accelerationY = 1
         self.mass = 1
+        self.time_added = time.time()
         self.schedule_events()
 
 
@@ -117,26 +119,27 @@ class particleGen(RelativeLayout):
 
     def moveParticle(self, dt):
         # first move particles
-        self.ParticlePosX += self.velocityX * dt + 0.5 * self.accelerationX * dt * dt
-        self.ParticlePosY += self.velocityY * dt + 0.5 * self.accelerationY * dt * dt
+        self.ParticlePosX += self.velocity_x * dt + 0.5 * self.accelerationX * dt * dt
+        self.ParticlePosY += self.velocity_y * dt + 0.5 * self.accelerationY * dt * dt
         # then check if particles have hit wall.
         # if they have then
+        print("parent", self.parent, self.time_added)
         if self.ParticlePosY > self.parent.height:
-            self.parent.pressure += self.mass * 2 * (abs(self.velocityY)) / dt
+            self.parent.pressure += self.mass * 2 * (abs(self.velocity_y)) / dt
             self.ParticlePosY = self.parent.height
-            self.velocityY = -self.velocityY
+            self.velocity_y = -self.velocity_y
         elif self.ParticlePosY < 0:
-            self.parent.pressure += self.mass * 2 * (abs(self.velocityY)) / dt
+            self.parent.pressure += self.mass * 2 * (abs(self.velocity_y)) / dt
             self.ParticlePosY = 0
-            self.velocityY = -self.velocityY
+            self.velocity_y = -self.velocity_y
         if self.ParticlePosX > self.parent.width:
-            self.parent.pressure += self.mass * 2 * (abs(self.velocityX)) / dt
+            self.parent.pressure += self.mass * 2 * (abs(self.velocity_x)) / dt
             self.ParticlePosX = self.parent.width
-            self.velocityX = -self.velocityX
+            self.velocity_x = -self.velocity_x
         elif self.ParticlePosX < 0:
-            self.parent.pressure += self.mass * 2 * (abs(self.velocityX)) / dt
+            self.parent.pressure += self.mass * 2 * (abs(self.velocity_x)) / dt
             self.ParticlePosX = 0
-            self.velocityX = -self.velocityX
+            self.velocity_x = -self.velocity_x
 
     pass
 
@@ -150,21 +153,23 @@ class ParticleBox(RelativeLayout):
     def __init__(self, **kwargs):
         super(ParticleBox, self).__init__(**kwargs)
         # ccreate list of widgets
-        self.particlesInBox = []
+        self.particles_in_box = {}
         self.size = (800, 600)
         self.velocity = 200
         self.temperature = (1/1000)*0.5*self.velocity**2
         self.number_particles = 200
+        print("particle start!")
         for i in range(self.number_particles):
-            particle = particleGen()
+            particle = Particle()
             particle.ParticlePosX = self.width * np.random.random()
             particle.ParticlePosY = self.height * np.random.random()
-            particle.velocityX = self.velocity * random.choice([-1, 1]) * np.random.random()
-            particle.velocityX = self.velocity * random.choice([-1, 1]) * np.random.random()
+            particle.velocity_x = self.velocity * random.choice([-1, 1]) * np.random.random()
+            particle.velocity_y = self.velocity * random.choice([-1, 1]) * np.random.random()
             particle.accelerationX = 1 ** random.choice([-1, 1]) * np.random.random()
             particle.accelerationY = 1 ** random.choice([-1, 1]) * np.random.random()
-            self.particlesInBox.append(particle)
-            self.add_widget(particle)
+            self.particles_in_box[i] = particle
+            print(i)
+            self.add_widget(self.particles_in_box[i])
             self.pressure = 0
             self.avgPressure = 0
 
@@ -193,21 +198,21 @@ class ParticleBox(RelativeLayout):
         if self.velocity != self.parent.parent.vslide.value:
             self.velocity = self.parent.parent.vslide.value
             self.temperature = (1/1000)*0.5*self.velocity**2
-            for particle in self.particlesInBox:
-                self.remove_widget(particle)
-            self.particlesInBox = []
-            for i in range(1000):
-                particle = particleGen()
+            for i, particle in enumerate(self.particles_in_box.keys()):
+                self.remove_widget(self.particles_in_box[i])
+                print("removing particle")
+            self.particles_in_box = {}
+            for i in range(self.number_particles):
+                particle = Particle()
                 particle.ParticlePosX = self.width * np.random.random()
                 particle.ParticlePosY = self.height * np.random.random()
-                particle.velocityX = self.velocity * random.choice([-1, 1]) * np.random.random()
-                particle.velocityX = self.velocity * random.choice([-1, 1]) * np.random.random()
+                particle.velocity_x = self.velocity * random.choice([-1, 1]) * np.random.random()
+                particle.velocity_y = self.velocity * random.choice([-1, 1]) * np.random.random()
                 particle.accelerationX = 1 ** random.choice([-1, 1]) * np.random.random()
                 particle.accelerationY = 1 ** random.choice([-1, 1]) * np.random.random()
-                self.particlesInBox.append(particle)
-                self.add_widget(particle)
-                self.pressure = 0
-                self.avgPressure = 0
+                self.particles_in_box[i] = particle
+                self.add_widget(self.particles_in_box[i])
+            print('finished adding', len(self.children), time.time())
 
 
 class glassWindow(RelativeLayout):
